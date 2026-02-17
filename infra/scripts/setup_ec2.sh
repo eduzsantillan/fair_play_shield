@@ -22,7 +22,7 @@ systemctl enable amazon-ssm-agent
 systemctl start amazon-ssm-agent
 
 cd /home/ec2-user
-git clone https://github.com/YOUR_USERNAME/fair_play_shield.git || echo "Repo already exists"
+git clone https://github.com/eduzsantillan/fair_play_shield.git || echo "Repo already exists"
 cd fair_play_shield
 
 cat > .env << 'ENVFILE'
