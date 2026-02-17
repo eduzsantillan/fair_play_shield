@@ -1,0 +1,6 @@
+aws_region       = "us-east-1"
+project_name     = "fair-play-shield"
+environment      = "dev"
+db_password      = "CHANGE_ME_secure_password_123!"
+ssh_key_name     = "your-key-pair-name"
+allowed_ssh_cidr = "YOUR_IP/32"
