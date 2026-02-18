@@ -36,6 +36,7 @@ logs/
 
 data/raw/
 data/processed/
+data/eda_output/
 *.csv
 *.pkl
 *.joblib
@@ -52,4 +53,4 @@ airflow/plugins/
 *.tfvars
 !variables.tfvars.example
 
-terraform.tfvars
+models/trained/
