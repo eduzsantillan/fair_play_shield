@@ -34,11 +34,11 @@ ALERT_ICONS = {
 
 def load_trained_models():
     try:
-        scaler = joblib.load(MODEL_DIR / "fps_scaler.pkl")
-        iso_forest = joblib.load(MODEL_DIR / "fps_isolation_forest.pkl")
-        rf_model = joblib.load(MODEL_DIR / "fps_random_forest.pkl")
-        lr_model = joblib.load(MODEL_DIR / "fps_logistic.pkl")
-        feature_cols = joblib.load(MODEL_DIR / "fps_feature_cols.pkl")
+        scaler = joblib.load(MODEL_DIR / "fps_leagues_scaler.pkl")
+        iso_forest = joblib.load(MODEL_DIR / "fps_leagues_isolation_forest.pkl")
+        rf_model = joblib.load(MODEL_DIR / "fps_leagues_random_forest.pkl")
+        lr_model = joblib.load(MODEL_DIR / "fps_leagues_logistic.pkl")
+        feature_cols = joblib.load(MODEL_DIR / "fps_leagues_feature_cols.pkl")
         return scaler, iso_forest, rf_model, lr_model, feature_cols
     except Exception as e:
         print(f"Error loading models: {e}")
