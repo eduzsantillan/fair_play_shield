@@ -51,14 +51,14 @@ Archivo: `requirements.txt`
 
 ### Paso 0: Requisitos previos
 
-- Python 3.9 o superior
+- Python 3.11 o superior
 - pip (gestor de paquetes de Python)
 - Conexión a internet (para descargar datos la primera vez)
 
 ### Paso 1: Instalar dependencias
 
 ```bash
-cd /Users/eduzuniga/Development/mioti/fair_play_shield
+cd fair_play_shield
 pip install -r requirements.txt
 ```
 
@@ -1427,7 +1427,7 @@ sudo docker logs fps-dashboard
 ```bash
 docker buildx build --platform linux/amd64 -t <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/fair-play-shield:latest -f Dockerfile.prod . --push
 
-ssh -i ~/.ssh/aws-dev.pem ec2-user@<EC2_PUBLIC_IP> "cd /home/ec2-user/fair_play_shield && sudo docker-compose pull && sudo docker-compose up -d"
+ssh -i ~/.ssh/aws-dev.pem ec2-user@<EC2_PUBLIC_IP> "cd /home/ec2-user/fair_play_shield && git pull && sudo docker-compose -f docker-compose.prod.yml pull && sudo docker-compose -f docker-compose.prod.yml up -d"
 ```
 
 ### Destruir Infraestructura
