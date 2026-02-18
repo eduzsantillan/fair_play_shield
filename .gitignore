@@ -54,3 +54,5 @@ airflow/plugins/
 !variables.tfvars.example
 
 models/trained/
+TERRAFORM_README.md
+TECHNICAL_README.md
