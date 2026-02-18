@@ -1,0 +1,17 @@
+services:
+  dashboard:
+    image: 806332783326.dkr.ecr.us-east-1.amazonaws.com/fair-play-shield:latest
+    container_name: fps-dashboard
+    ports:
+      - "8050:8050"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - S3_BUCKET=${S3_BUCKET}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-http://localhost:5001}
+    restart: unless-stopped
+    mem_limit: 512m

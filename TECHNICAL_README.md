@@ -1317,35 +1317,179 @@ El CSV de entrada debe tener columnas similares a:
 
 ---
 
-## 25. Resumen de Comandos
+## 25. Guía de Instalación Paso a Paso
 
-### Desarrollo Local
+### Requisitos Previos
+
+- **Python 3.11+**
+- **Docker & Docker Compose**
+- **AWS CLI** configurado con credenciales
+- **Terraform** >= 1.0
+- **Git**
+
+### Opción A: Desarrollo Local
 
 ```bash
+git clone https://github.com/eduzsantillan/fair_play_shield.git
+cd fair_play_shield
+
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+cp .env.example .env
+
 python main.py --step all --seasons 3
 
 python dashboard/app.py
-
-./scripts/init_airflow.sh
-
-docker-compose down
 ```
 
-### Producción AWS
+**Con Docker Compose (MLflow + Airflow):**
 
 ```bash
-cd infra/terraform && terraform apply -var-file=terraform.tfvars
+./scripts/init_airflow.sh
+```
 
-aws lambda invoke --function-name fair-play-shield-pipeline-trigger out.json
+### Opción B: Despliegue AWS Free Tier
 
-ssh -i ~/.ssh/your-key.pem ec2-user@<EC2_IP>
+#### Paso 1: Configurar AWS CLI
 
+```bash
+aws configure
+# Ingresa: Access Key, Secret Key, Region (us-east-1)
+```
+
+#### Paso 2: Crear Key Pair en AWS
+
+```bash
+aws ec2 create-key-pair --key-name aws-dev --query 'KeyMaterial' --output text > ~/.ssh/aws-dev.pem
+chmod 400 ~/.ssh/aws-dev.pem
+```
+
+#### Paso 3: Crear Repositorio ECR
+
+```bash
+aws ecr create-repository --repository-name fair-play-shield --region us-east-1
+```
+
+#### Paso 4: Construir y Subir Imagen Docker
+
+```bash
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+
+docker buildx build --platform linux/amd64 -t <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/fair-play-shield:latest -f Dockerfile.prod . --push
+```
+
+#### Paso 5: Configurar Variables Terraform
+
+```bash
+cd infra/terraform
+cp variables.tfvars.example terraform.tfvars
+```
+
+Editar `terraform.tfvars`:
+
+```hcl
+aws_region      = "us-east-1"
+project_name    = "fair-play-shield"
+environment     = "dev"
+db_password     = "tu_password_seguro"  # Sin caracteres especiales (@, #, etc.)
+ssh_key_name    = "aws-dev"
+allowed_ssh_cidr = "0.0.0.0/0"  # O tu IP específica
+```
+
+#### Paso 6: Desplegar Infraestructura
+
+```bash
+terraform init
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars -auto-approve
+```
+
+#### Paso 7: Verificar Despliegue
+
+```bash
+terraform output
+
+curl http://<EC2_PUBLIC_IP>:8050
+```
+
+#### Paso 8: Acceder por SSH (opcional)
+
+```bash
+ssh -i ~/.ssh/aws-dev.pem ec2-user@<EC2_PUBLIC_IP>
+sudo docker ps
+sudo docker logs fps-dashboard
+```
+
+### Redesplegar Cambios
+
+```bash
+docker buildx build --platform linux/amd64 -t <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/fair-play-shield:latest -f Dockerfile.prod . --push
+
+ssh -i ~/.ssh/aws-dev.pem ec2-user@<EC2_PUBLIC_IP> "cd /home/ec2-user/fair_play_shield && sudo docker-compose pull && sudo docker-compose up -d"
+```
+
+### Destruir Infraestructura
+
+```bash
+cd infra/terraform
 terraform destroy -var-file=terraform.tfvars
 ```
 
-### URLs
+---
+
+## 26. Arquitectura AWS Free Tier
+
+### Componentes Desplegados
+
+| Servicio        | Tipo                   | Propósito       |
+| --------------- | ---------------------- | --------------- |
+| **EC2**         | t3.micro (1GB RAM)     | Dashboard       |
+| **RDS**         | db.t3.micro PostgreSQL | Base de datos   |
+| **S3**          | Bucket                 | Datos y modelos |
+| **ECR**         | Repositorio            | Imágenes Docker |
+| **Lambda**      | Función                | Trigger semanal |
+| **EventBridge** | Regla                  | Scheduler       |
+
+### Limitaciones Free Tier
+
+- **t3.micro** tiene solo 1GB RAM → Solo Dashboard en EC2
+- **MLflow y Airflow** deben correr localmente para desarrollo
+- Para producción completa, usar t3.small o superior
+
+### URLs de Servicios
 
 | Entorno   | Dashboard             | MLflow                | Airflow               |
 | --------- | --------------------- | --------------------- | --------------------- |
 | **Local** | http://localhost:8050 | http://localhost:5001 | http://localhost:8080 |
-| **AWS**   | http://EC2_IP:8050    | http://EC2_IP:5001    | http://EC2_IP:8080    |
+| **AWS**   | http://EC2_IP:8050    | Local                 | Local                 |
+
+---
+
+## 27. Troubleshooting
+
+### EC2 no responde
+
+```bash
+aws ec2 reboot-instances --instance-ids <INSTANCE_ID>
+
+ssh -i ~/.ssh/aws-dev.pem ec2-user@<EC2_IP> "sudo docker logs fps-dashboard"
+```
+
+### Error de arquitectura Docker
+
+```bash
+docker buildx build --platform linux/amd64 ...
+```
+
+### RDS conexión rechazada
+
+Verificar Security Group permite puerto 5432 desde EC2.
+
+### Dashboard no accesible
+
+```bash
+ssh -i ~/.ssh/aws-dev.pem ec2-user@<EC2_IP> "sudo docker ps"
+ssh -i ~/.ssh/aws-dev.pem ec2-user@<EC2_IP> "curl localhost:8050"
+```
