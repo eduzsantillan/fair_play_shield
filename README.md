@@ -43,16 +43,14 @@ fair_play_shield/
 │   ├── europa_league_scraper.py     # UEFA Europa League (ESPN API)
 │   └── european_leagues_scraper.py  # 10 ligas europeas (football-data.co.uk)
 ├── processing/data_cleaning.py      # Limpieza + feature engineering
-├── models/
-│   ├── integrity_scorer.py          # Isolation Forest + Random Forest + Logistic
-│   └── trained/                     # Modelos serializados (.pkl)
-├── notebooks/01_eda.py              # Análisis exploratorio + tests estadísticos
+├── models/integrity_scorer.py       # IF + RF + LR → MIS
 ├── dashboard/app.py                 # Dashboard Dash/Plotly
-├── data/
-│   ├── raw/                         # Datos crudos descargados
-│   ├── processed/                   # Datos procesados + integrity_scores.csv
-│   └── eda_output/                  # Gráficos EDA
-└── requirements.txt
+├── airflow/dags/                    # DAGs de Airflow
+├── scripts/                         # Scripts de utilidad
+├── infra/terraform/                 # Infraestructura AWS
+├── docker-compose.yml               # Desarrollo local
+├── docker-compose.prod.yml          # Producción AWS
+└── TECHNICAL_README.md              # Documentación técnica completa
 ```
 
 ## Fuentes de datos
