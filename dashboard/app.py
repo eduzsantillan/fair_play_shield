@@ -5,11 +5,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
+import joblib
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.settings import PROCESSED_DATA_DIR, RAW_DATA_DIR
+
+MODEL_DIR = Path(__file__).resolve().parent.parent / "models" / "trained"
 
 SCORES_PATH = PROCESSED_DATA_DIR / "integrity_scores.csv"
 LEAGUES_PATH = PROCESSED_DATA_DIR / "european_leagues_with_odds_processed.csv"
@@ -27,6 +30,23 @@ ALERT_ICONS = {
     "suspicious": "🟠",
     "high_alert": "🔴",
 }
+
+
+def load_trained_models():
+    try:
+        scaler = joblib.load(MODEL_DIR / "fps_scaler.pkl")
+        iso_forest = joblib.load(MODEL_DIR / "fps_isolation_forest.pkl")
+        rf_model = joblib.load(MODEL_DIR / "fps_random_forest.pkl")
+        lr_model = joblib.load(MODEL_DIR / "fps_logistic.pkl")
+        feature_cols = joblib.load(MODEL_DIR / "fps_feature_cols.pkl")
+        return scaler, iso_forest, rf_model, lr_model, feature_cols
+    except Exception as e:
+        print(f"Error loading models: {e}")
+        return None, None, None, None, None
+
+
+scaler, iso_forest, rf_model, lr_model, feature_cols = load_trained_models()
+MODELS_LOADED = scaler is not None
 
 
 def load_data():
@@ -312,6 +332,119 @@ def build_europa_league_panel():
     ])
 
 
+def build_prediction_form():
+    if not MODELS_LOADED:
+        return dbc.Alert("⚠️ Modelos no cargados. Ejecuta primero el entrenamiento.", color="warning")
+    
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H5("🎯 Predicción de Integridad de Partido")),
+                    dbc.CardBody([
+                        html.P("Ingresa los datos del partido para predecir si presenta anomalías sospechosas.", className="text-muted mb-4"),
+                        
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("Equipo Local"),
+                                dbc.Input(id="input-home-team", type="text", placeholder="Ej: Real Madrid"),
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("Equipo Visitante"),
+                                dbc.Input(id="input-away-team", type="text", placeholder="Ej: Barcelona"),
+                            ], width=6),
+                        ], className="mb-3"),
+                        
+                        html.Hr(),
+                        html.H6("📊 Estadísticas del Partido", className="mb-3"),
+                        
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("Goles Local"),
+                                dbc.Input(id="input-home-goals", type="number", value=1, min=0, max=15),
+                            ], width=3),
+                            dbc.Col([
+                                dbc.Label("Goles Visitante"),
+                                dbc.Input(id="input-away-goals", type="number", value=0, min=0, max=15),
+                            ], width=3),
+                            dbc.Col([
+                                dbc.Label("Tarjetas Totales"),
+                                dbc.Input(id="input-cards", type="number", value=3, min=0, max=20),
+                            ], width=3),
+                            dbc.Col([
+                                dbc.Label("Resultado HT cambió"),
+                                dbc.Select(id="input-ht-changed", options=[
+                                    {"label": "No", "value": "0"},
+                                    {"label": "Sí", "value": "1"},
+                                ], value="0"),
+                            ], width=3),
+                        ], className="mb-3"),
+                        
+                        html.Hr(),
+                        html.H6("💰 Datos de Cuotas (Apuestas)", className="mb-3"),
+                        
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("Movimiento de cuotas (%)"),
+                                dbc.Input(id="input-odds-movement", type="number", value=5, min=0, max=100, step=0.1),
+                                dbc.FormText("Cambio % entre cuota apertura y cierre"),
+                            ], width=4),
+                            dbc.Col([
+                                dbc.Label("Resultado sorpresa"),
+                                dbc.Select(id="input-result-surprise", options=[
+                                    {"label": "No (favorito ganó)", "value": "0"},
+                                    {"label": "Sí (no favorito ganó)", "value": "1"},
+                                ], value="0"),
+                                dbc.FormText("¿Ganó el equipo menos favorecido?"),
+                            ], width=4),
+                            dbc.Col([
+                                dbc.Label("Ruptura de racha"),
+                                dbc.Select(id="input-streak-break", options=[
+                                    {"label": "No", "value": "0"},
+                                    {"label": "Sí", "value": "1"},
+                                ], value="0"),
+                                dbc.FormText("¿Se rompió racha de 5+ victorias?"),
+                            ], width=4),
+                        ], className="mb-4"),
+                        
+                        dbc.Button("🔍 Analizar Partido", id="btn-predict", color="primary", size="lg", className="w-100"),
+                    ])
+                ], className="bg-dark border-primary"),
+            ], width=6),
+            
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H5("📋 Resultado del Análisis")),
+                    dbc.CardBody(id="prediction-result", children=[
+                        html.Div([
+                            html.I(className="fas fa-arrow-left me-2"),
+                            html.P("Completa el formulario y haz clic en 'Analizar Partido'", className="text-muted text-center mt-5"),
+                        ], className="text-center", style={"minHeight": "400px", "display": "flex", "alignItems": "center", "justifyContent": "center"}),
+                    ])
+                ], className="bg-dark border-secondary h-100"),
+            ], width=6),
+        ]),
+        
+        html.Hr(className="my-4"),
+        
+        dbc.Card([
+            dbc.CardHeader(html.H6("ℹ️ Cómo interpretar los resultados")),
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        html.P([html.Strong("🟢 Normal (0-30): "), "El partido no presenta anomalías significativas."]),
+                        html.P([html.Strong("🟡 Monitor (31-60): "), "Algunas señales menores, seguimiento recomendado."]),
+                    ], width=6),
+                    dbc.Col([
+                        html.P([html.Strong("🟠 Sospechoso (61-80): "), "Múltiples anomalías detectadas, investigar."]),
+                        html.P([html.Strong("🔴 Alta Sospecha (81-100): "), "Patrón altamente anómalo, requiere revisión urgente."]),
+                    ], width=6),
+                ]),
+            ])
+        ], className="bg-dark border-info"),
+    ])
+
+
 app.layout = dbc.Container([
     dbc.Navbar(
         dbc.Container([
@@ -442,6 +575,12 @@ app.layout = dbc.Container([
                 ),
             ], className="mt-3")
         ]),
+
+        dbc.Tab(label="🎯 Predicción", children=[
+            html.Div([
+                build_prediction_form(),
+            ], className="mt-3")
+        ]),
     ]),
 
     html.Footer([
@@ -503,6 +642,149 @@ def filter_league(leagues):
     if leagues:
         df = df[df["league_name"].isin(leagues)]
     return df.head(200).to_dict("records")
+
+
+@callback(
+    Output("prediction-result", "children"),
+    Input("btn-predict", "n_clicks"),
+    State("input-home-team", "value"),
+    State("input-away-team", "value"),
+    State("input-home-goals", "value"),
+    State("input-away-goals", "value"),
+    State("input-cards", "value"),
+    State("input-ht-changed", "value"),
+    State("input-odds-movement", "value"),
+    State("input-result-surprise", "value"),
+    State("input-streak-break", "value"),
+    prevent_initial_call=True,
+)
+def predict_match(n_clicks, home_team, away_team, home_goals, away_goals, cards, ht_changed, odds_movement, result_surprise, streak_break):
+    if not MODELS_LOADED:
+        return dbc.Alert("Modelos no disponibles", color="danger")
+    
+    if not home_team or not away_team:
+        return dbc.Alert("Ingresa los nombres de los equipos", color="warning")
+    
+    try:
+        home_goals = int(home_goals or 0)
+        away_goals = int(away_goals or 0)
+        cards = int(cards or 0)
+        ht_changed = int(ht_changed or 0)
+        odds_movement = float(odds_movement or 0) / 100
+        result_surprise = int(result_surprise or 0)
+        streak_break = int(streak_break or 0)
+        
+        total_goals = home_goals + away_goals
+        
+        goals_mean = leagues_df["total_goals"].mean() if "total_goals" in leagues_df.columns else 2.5
+        goals_std = leagues_df["total_goals"].std() if "total_goals" in leagues_df.columns else 1.5
+        goals_anomaly = 1 if goals_std > 0 and abs(total_goals - goals_mean) / goals_std > 2 else 0
+        
+        cards_mean = leagues_df["total_cards"].mean() if "total_cards" in leagues_df.columns else 4
+        cards_anomaly = 1 if cards > cards_mean * 1.5 else 0
+        
+        flag_odds = 1 if odds_movement > 0.15 else 0
+        
+        input_data = {
+            "odds_movement_abs_max": odds_movement,
+            "result_surprise": result_surprise,
+            "ht_result_changed": ht_changed,
+            "total_goals": total_goals,
+            "total_cards": cards,
+            "flag_odds_movement": flag_odds,
+            "flag_result_surprise": result_surprise,
+            "flag_streak_break": streak_break,
+            "flag_goals_anomaly_home": goals_anomaly,
+            "flag_goals_anomaly_away": goals_anomaly,
+            "flag_ht_result_changed": ht_changed,
+            "flag_cards_anomaly": cards_anomaly,
+        }
+        
+        df_input = pd.DataFrame([input_data])
+        
+        available_features = [f for f in feature_cols if f in df_input.columns]
+        for f in feature_cols:
+            if f not in df_input.columns:
+                df_input[f] = 0
+        
+        X = df_input[feature_cols].fillna(0)
+        X_scaled = scaler.transform(X)
+        
+        iso_raw = iso_forest.decision_function(X_scaled)[0]
+        iso_norm = 1 - (iso_raw - (-0.5)) / (0.5 - (-0.5) + 1e-8)
+        iso_norm = max(0, min(1, iso_norm))
+        
+        rf_proba = rf_model.predict_proba(X_scaled)[0][1]
+        lr_proba = lr_model.predict_proba(X_scaled)[0][1]
+        
+        integrity_score = (0.35 * iso_norm + 0.40 * rf_proba + 0.25 * lr_proba) * 100
+        integrity_score = max(0, min(100, integrity_score))
+        
+        if integrity_score <= 30:
+            alert_level, alert_color, alert_icon = "Normal", "success", "🟢"
+        elif integrity_score <= 60:
+            alert_level, alert_color, alert_icon = "Monitor", "warning", "🟡"
+        elif integrity_score <= 80:
+            alert_level, alert_color, alert_icon = "Sospechoso", "orange", "🟠"
+        else:
+            alert_level, alert_color, alert_icon = "Alta Sospecha", "danger", "🔴"
+        
+        flags_detected = []
+        if flag_odds > 0:
+            flags_detected.append("Movimiento de cuotas >15%")
+        if result_surprise > 0:
+            flags_detected.append("Resultado sorpresa")
+        if streak_break > 0:
+            flags_detected.append("Ruptura de racha")
+        if goals_anomaly > 0:
+            flags_detected.append("Goles anómalos")
+        if ht_changed > 0:
+            flags_detected.append("Cambio resultado HT")
+        if cards_anomaly > 0:
+            flags_detected.append("Tarjetas anómalas")
+        
+        return html.Div([
+            html.Div([
+                html.H1(f"{alert_icon}", style={"fontSize": "4rem"}),
+                html.H2(f"{integrity_score:.1f}", className=f"text-{alert_color}" if alert_color != "orange" else "text-warning"),
+                html.P("Match Integrity Score", className="text-muted"),
+            ], className="text-center mb-4"),
+            
+            dbc.Alert([
+                html.H5(f"{alert_icon} {alert_level}", className="alert-heading"),
+                html.P(f"{home_team} vs {away_team}"),
+            ], color=alert_color if alert_color != "orange" else "warning"),
+            
+            html.Hr(),
+            
+            html.H6("📊 Desglose de Scores"),
+            dbc.Progress([
+                dbc.Progress(value=iso_norm*100, color="info", bar=True, label=f"IF: {iso_norm*100:.0f}"),
+            ], className="mb-2", style={"height": "25px"}),
+            dbc.Progress([
+                dbc.Progress(value=rf_proba*100, color="primary", bar=True, label=f"RF: {rf_proba*100:.0f}"),
+            ], className="mb-2", style={"height": "25px"}),
+            dbc.Progress([
+                dbc.Progress(value=lr_proba*100, color="secondary", bar=True, label=f"LR: {lr_proba*100:.0f}"),
+            ], className="mb-3", style={"height": "25px"}),
+            
+            html.Small("IF=Isolation Forest, RF=Random Forest, LR=Logistic Regression", className="text-muted"),
+            
+            html.Hr(),
+            
+            html.H6(f"🚩 Flags Detectados ({len(flags_detected)})"),
+            html.Ul([html.Li(f, className="text-warning") for f in flags_detected]) if flags_detected else html.P("Ninguno", className="text-success"),
+            
+            html.Hr(),
+            
+            html.H6("📋 Datos de Entrada"),
+            html.Small([
+                html.Div(f"Goles: {home_goals}-{away_goals} | Tarjetas: {cards} | Mov. cuotas: {odds_movement*100:.1f}%"),
+            ], className="text-muted"),
+        ])
+        
+    except Exception as e:
+        return dbc.Alert(f"Error en predicción: {str(e)}", color="danger")
 
 
 if __name__ == "__main__":
