@@ -27,8 +27,15 @@ def task_ingest_europa_league(**context):
     run_el(seasons_back=seasons_back)
 
 def task_process_data(**context):
-    from processing.data_cleaning import process_all_data
-    process_all_data()
+    from processing.data_cleaning import process_and_save
+    for input_file, output_file in [
+        ("european_leagues_with_odds.csv", "european_leagues_with_odds_processed.csv"),
+        ("europa_league_matches.csv", "europa_league_matches_processed.csv"),
+    ]:
+        try:
+            process_and_save(input_file, output_file)
+        except FileNotFoundError:
+            pass
 
 def task_train_and_score(**context):
     from models.integrity_scorer import train_and_score
@@ -38,7 +45,7 @@ def task_notify_completion(**context):
     execution_date = context['execution_date']
     print(f"✅ Pipeline completed successfully at {execution_date}")
     print("📊 Dashboard ready at http://localhost:8050")
-    print("📈 MLflow UI at http://localhost:5000")
+    print("📈 MLflow UI at http://localhost:5001")
 
 with DAG(
     'fps_pipeline',

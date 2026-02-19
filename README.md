@@ -9,20 +9,18 @@ cd fair_play_shield
 pip install -r requirements.txt
 ```
 
-## Ejecución completa (3 pasos)
+## Ejecución completa (manual)
 
 ```bash
 # 1. Descargar datos + procesar + generar features
 python main.py --step all --seasons 3
 
-# 2. Análisis exploratorio (genera gráficos en data/eda_output/)
-python notebooks/01_eda.py
-
-# 3. Entrenar modelos y generar integrity scores
+# 2. Entrenar modelos y generar integrity scores
 python models/integrity_scorer.py
 
-# 4. Lanzar dashboard interactivo (http://localhost:8050)
+# 3. Lanzar dashboard interactivo
 python dashboard/app.py
+# Abre http://localhost:8050
 ```
 
 ## Ejecución por pasos
@@ -30,6 +28,36 @@ python dashboard/app.py
 ```bash
 python main.py --step scrape --seasons 5   # Solo descarga
 python main.py --step process              # Solo procesamiento
+```
+
+## Ejecución con Airflow (automática)
+
+Airflow orquesta el pipeline completo de forma automática cada lunes a las 6:00 AM,
+sin necesidad de ejecutar `main.py` ni `integrity_scorer.py` manualmente.
+
+```bash
+# Arrancar todo (Airflow + MLflow + Dashboard)
+bash scripts/start.sh
+```
+
+Esto levanta:
+
+- **Airflow** en http://localhost:8080 (user: `airflow`, pass: `airflow`)
+- **MLflow** en http://localhost:5001
+- **Dashboard** en http://localhost:8050
+
+El pipeline se ejecuta automáticamente cada lunes. Para dispararlo manualmente:
+
+```bash
+docker exec airflow-scheduler airflow dags trigger fps_pipeline
+```
+
+> **Nota:** Airflow no está desplegado en AWS EC2 por limitaciones de RAM del t3.micro (1GB).
+> Para producción en AWS se recomienda una instancia t3.small o superior.
+
+```bash
+# Detener todos los servicios
+bash scripts/stop_services.sh
 ```
 
 ## Estructura del proyecto
@@ -50,7 +78,7 @@ fair_play_shield/
 ├── infra/terraform/                 # Infraestructura AWS
 ├── docker-compose.yml               # Desarrollo local
 ├── docker-compose.prod.yml          # Producción AWS
-└── TECHNICAL_README.md              # Documentación técnica completa
+└── Dockerfile.prod                  # Imagen Docker para producción
 ```
 
 ## Fuentes de datos
@@ -89,9 +117,10 @@ Los 3 modelos se combinan en un **Match Integrity Score (MIS)** ponderado: 0-100
 
 ## Dashboard
 
-4 pestañas interactivas:
+5 pestañas interactivas:
 
 - **Análisis General**: distribución de scores, comparativa por liga, evolución temporal, scatter cuotas vs goles
 - **Alertas**: listado de partidos sospechosos con notificaciones, buscador, filtros
 - **Europa League**: resultados, goleadores, partidos por país, tabla filtrable
 - **Datos completos**: tabla con todos los scores, filtrable por liga
+- **Predicción**: formulario para ingresar datos de un partido y predecir su MIS en tiempo real

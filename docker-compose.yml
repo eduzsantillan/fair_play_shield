@@ -139,6 +139,21 @@ services:
       - -c
       - airflow
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8050:8050"
+    volumes:
+      - ./data:/app/data
+      - ./models/trained:/app/models/trained
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5001
+    restart: always
+    depends_on:
+      - mlflow
+
 volumes:
   postgres-db-volume:
   mlflow-data:

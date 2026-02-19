@@ -57,3 +57,4 @@ models/trained/
 TERRAFORM_README.md
 TECHNICAL_README.md
 airflow/logs/
+fps_excalidraw_elements.json
