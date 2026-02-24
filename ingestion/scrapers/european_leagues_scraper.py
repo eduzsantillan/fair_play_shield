@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 from io import StringIO
 from pathlib import Path
+from datetime import date as _date
 import time
 import sys
 
@@ -21,8 +22,12 @@ LEAGUE_CODES = {
     "E0": "Premier League (Inglaterra)",
 }
 
+_current_year = _date.today().year
+_current_month = _date.today().month
+_season_end_year = _current_year if _current_month >= 7 else _current_year - 1
+
 SEASONS = []
-for year in range(2014, 2025):
+for year in range(2014, _season_end_year + 1):
     short = f"{str(year)[-2:]}{str(year + 1)[-2:]}"
     SEASONS.append((f"{year}-{year+1}", short))
 
