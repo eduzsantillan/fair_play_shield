@@ -1,7 +1,7 @@
 import pandas as pd
 import requests
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as _date
 import time
 import sys
 
@@ -10,18 +10,15 @@ from config.settings import RAW_DATA_DIR
 
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard"
 
-SEASON_RANGES = {
-    "2024-2025": ("20240901", "20250601"),
-    "2023-2024": ("20230901", "20240601"),
-    "2022-2023": ("20220901", "20230601"),
-    "2021-2022": ("20210901", "20220601"),
-    "2020-2021": ("20200901", "20210601"),
-    "2019-2020": ("20190901", "20200901"),
-    "2018-2019": ("20180901", "20190601"),
-    "2017-2018": ("20170901", "20180601"),
-    "2016-2017": ("20160901", "20170601"),
-    "2015-2016": ("20150901", "20160601"),
-}
+_today = _date.today()
+_season_start_year = _today.year if _today.month >= 7 else _today.year - 1
+
+SEASON_RANGES = {}
+for _y in range(2015, _season_start_year + 1):
+    _key = f"{_y}-{_y + 1}"
+    _start = f"{_y}0901"
+    _end = f"{_y + 1}0601"
+    SEASON_RANGES[_key] = (_start, _end)
 
 
 def get_stat(stats_list, stat_name):
