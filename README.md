@@ -32,8 +32,12 @@ python main.py --step process              # Solo procesamiento
 
 ## Ejecución con Airflow (automática)
 
-Airflow orquesta el pipeline completo de forma automática cada lunes a las 6:00 AM,
-sin necesidad de ejecutar `main.py` ni `integrity_scorer.py` manualmente.
+Airflow gestiona dos DAGs independientes:
+
+| DAG           | Schedule           | Qué hace                                                       |
+| ------------- | ------------------ | -------------------------------------------------------------- |
+| `fps_scoring` | Cada lunes 6:00 AM | Scraping + procesamiento + scoring con modelo existente        |
+| `fps_retrain` | Día 1 de cada mes  | Scraping + procesamiento + reentrenamiento completo del modelo |
 
 ```bash
 # Arrancar todo (Airflow + MLflow + Dashboard)
@@ -46,10 +50,14 @@ Esto levanta:
 - **MLflow** en http://localhost:5001
 - **Dashboard** en http://localhost:8050
 
-El pipeline se ejecuta automáticamente cada lunes. Para dispararlo manualmente:
+Disparo manual:
 
 ```bash
-docker exec airflow-scheduler airflow dags trigger fps_pipeline
+# Scoring semanal (usa modelo guardado)
+docker exec airflow-scheduler airflow dags trigger fps_scoring
+
+# Reentrenamiento mensual
+docker exec airflow-scheduler airflow dags trigger fps_retrain
 ```
 
 > **Nota:** Airflow no está desplegado en AWS EC2 por limitaciones de RAM del t3.micro (1GB).

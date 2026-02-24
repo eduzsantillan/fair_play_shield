@@ -308,6 +308,44 @@ def log_to_mlflow(scorer, results, df):
         print(f"[MLFLOW] Run logged successfully")
 
 
+def score_only(prefix="fps_leagues"):
+    print("=" * 60)
+    print("FAIR PLAY SHIELD — Scoring con modelo existente")
+    print("=" * 60)
+
+    leagues_path = PROCESSED_DATA_DIR / "european_leagues_with_odds_processed.csv"
+    if not leagues_path.exists():
+        print(f"[ERROR] No se encontró: {leagues_path}")
+        return None
+
+    model_path = MODEL_DIR / f"{prefix}_scaler.pkl"
+    if not model_path.exists():
+        print(f"[ERROR] Modelo '{prefix}' no encontrado. Ejecuta train_and_score() primero.")
+        return None
+
+    df = pd.read_csv(leagues_path, parse_dates=["date"], low_memory=False)
+    print(f"\nDatos cargados: {len(df)} partidos")
+
+    scorer = IntegrityScorer()
+    scorer.load(prefix)
+
+    results = scorer.score(df)
+
+    print("\n--- Distribución de alertas ---")
+    alert_dist = results["alert_level"].value_counts()
+    for level in ["normal", "monitor", "suspicious", "high_alert"]:
+        count = alert_dist.get(level, 0)
+        pct = count / len(results) * 100
+        emoji = {"normal": "🟢", "monitor": "🟡", "suspicious": "🟠", "high_alert": "🔴"}.get(level, "")
+        print(f"  {emoji} {level:15s}: {count:5d} ({pct:.1f}%)")
+
+    output_path = PROCESSED_DATA_DIR / "integrity_scores.csv"
+    results.to_csv(output_path, index=False)
+    print(f"\n[SAVED] Scores guardados en: {output_path}")
+
+    return results
+
+
 def train_and_score():
     print("=" * 60)
     print("FAIR PLAY SHIELD — Entrenamiento de modelos")
