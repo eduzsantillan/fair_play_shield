@@ -48,10 +48,12 @@ services:
 
   mlflow:
     image: python:3.11-slim
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
     command: >
       bash -c "pip install mlflow psycopg2-binary boto3 &&
                mlflow server --host 0.0.0.0 --port 5001 
-               --backend-store-uri sqlite:///mlflow.db 
+               --backend-store-uri sqlite:////mlflow/mlflow.db 
                --default-artifact-root /mlflow/artifacts"
     ports:
       - "5001:5001"

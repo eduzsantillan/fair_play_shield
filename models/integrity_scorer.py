@@ -64,7 +64,7 @@ class IntegrityScorer:
     def __init__(self):
         self.scaler = StandardScaler()
         self.isolation_forest = IsolationForest(
-            contamination=0.08,
+            contamination=0.04,
             n_estimators=200,
             max_samples="auto",
             random_state=42,
@@ -269,7 +269,7 @@ def log_to_mlflow(scorer, results, df):
         return
 
     with mlflow.start_run(run_name=f"training_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"):
-        mlflow.log_param("isolation_forest_contamination", 0.08)
+        mlflow.log_param("isolation_forest_contamination", float(getattr(scorer.isolation_forest, "contamination", 0)))
         mlflow.log_param("isolation_forest_n_estimators", 200)
         mlflow.log_param("random_forest_n_estimators", 200)
         mlflow.log_param("random_forest_max_depth", 10)
@@ -308,10 +308,34 @@ def log_to_mlflow(scorer, results, df):
         print(f"[MLFLOW] Run logged successfully")
 
 
+def log_scoring_to_mlflow(prefix, results, df):
+    if not MLFLOW_AVAILABLE:
+        return
+
+    with mlflow.start_run(run_name=f"scoring_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"):
+        mlflow.log_param("model_prefix", prefix)
+        mlflow.log_param("total_matches", len(df))
+
+        alert_dist = results["alert_level"].value_counts()
+        for level in ["normal", "monitor", "suspicious", "high_alert"]:
+            count = int(alert_dist.get(level, 0))
+            mlflow.log_metric(f"alert_{level}_count", count)
+            mlflow.log_metric(f"alert_{level}_pct", count / max(len(results), 1) * 100)
+
+        mlflow.log_metric("avg_integrity_score", float(results["integrity_score"].mean()))
+        mlflow.log_metric("max_integrity_score", float(results["integrity_score"].max()))
+
+        output_path = PROCESSED_DATA_DIR / "integrity_scores.csv"
+        if output_path.exists():
+            mlflow.log_artifact(str(output_path))
+
+
 def score_only(prefix="fps_leagues"):
     print("=" * 60)
     print("FAIR PLAY SHIELD — Scoring con modelo existente")
     print("=" * 60)
+
+    mlflow_enabled = setup_mlflow()
 
     leagues_path = PROCESSED_DATA_DIR / "european_leagues_with_odds_processed.csv"
     if not leagues_path.exists():
@@ -342,6 +366,9 @@ def score_only(prefix="fps_leagues"):
     output_path = PROCESSED_DATA_DIR / "integrity_scores.csv"
     results.to_csv(output_path, index=False)
     print(f"\n[SAVED] Scores guardados en: {output_path}")
+
+    if mlflow_enabled:
+        log_scoring_to_mlflow(prefix, results, df)
 
     return results
 

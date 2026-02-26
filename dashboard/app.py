@@ -309,9 +309,12 @@ def build_scatter_odds():
     if "odds_movement_abs_max" not in leagues_df.columns:
         return go.Figure()
 
-    sample = leagues_df.dropna(subset=["odds_movement_abs_max", "total_goals"]).sample(
-        min(3000, len(leagues_df)), random_state=42
-    )
+    filtered = leagues_df.dropna(subset=["odds_movement_abs_max", "total_goals"])
+    if filtered.empty:
+        return go.Figure()
+
+    n = min(3000, len(filtered))
+    sample = filtered.sample(n=n, random_state=42)
     merged = sample.merge(
         scores_df[["date", "home_team", "away_team", "integrity_score", "alert_level"]],
         on=["date", "home_team", "away_team"],
